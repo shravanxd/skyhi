@@ -19,7 +19,7 @@ This started as a side project built around one window, one antenna, and the que
 - Cycles between an identity page and a live metrics page
 - Handles dark airline artwork without adding permanent white logo boxes
 - Scrolls long aircraft names such as `737 MAX 8`
-- Shows an idle screen with time, day, weather, receiver activity, and signal bars
+- Shows an idle screen with time, day, weather, and live adsb.fi feed health
 - Provides a phone-friendly dashboard at `http://skyhi.local:8080`
 - Tracks API credit usage and throttles polling to protect a fixed budget
 - Starts automatically and recovers from crashes through systemd

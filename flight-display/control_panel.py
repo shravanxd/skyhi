@@ -245,7 +245,12 @@ class Handler(BaseHTTPRequestHandler):
         payload = read_json(AIRCRAFT_PATH, {})
         aircraft = next((item for item in payload.get("aircraft", []) if str(item.get("flight") or "").strip()), None)
         if mode == "idle" or aircraft is None:
-            frame = renderer.idle(len(payload.get("aircraft", [])), read_json(WEATHER_PATH, {}))
+            feed_active = subprocess.run(
+                ["systemctl", "is-active", "--quiet", "adsbfi-feed.service", "adsbfi-mlat.service"],
+                check=False,
+                timeout=2,
+            ).returncode == 0
+            frame = renderer.idle(len(payload.get("aircraft", [])), read_json(WEATHER_PATH, {}), feed_active)
         else:
             item = dict(aircraft)
             if item.get("lat") is not None and item.get("lon") is not None and config.get("receiver_lat") is not None:

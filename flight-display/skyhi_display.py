@@ -12,6 +12,7 @@ import os
 import re
 import signal
 import sqlite3
+import subprocess
 import tempfile
 import threading
 import time
@@ -205,6 +206,32 @@ class WeatherCache:
         finally:
             with self.lock:
                 self.fetching = False
+
+
+class ServiceHealth:
+    """Cache a small group of systemd service checks for the LED status row."""
+
+    def __init__(self, services: tuple[str, ...], refresh_seconds: float = 5.0):
+        self.services = services
+        self.refresh_seconds = refresh_seconds
+        self.active: bool | None = None
+        self.next_check = 0.0
+
+    def get(self) -> bool | None:
+        now = time.monotonic()
+        if now < self.next_check:
+            return self.active
+        self.next_check = now + self.refresh_seconds
+        try:
+            result = subprocess.run(
+                ["systemctl", "is-active", "--quiet", *self.services],
+                check=False,
+                timeout=2,
+            )
+            self.active = result.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            self.active = False
+        return self.active
 
 
 class EnrichmentCache:
@@ -523,7 +550,8 @@ class Renderer:
         draw.text((38, 47), "READY", font=self.f10, fill=colors["good"])
         return image
 
-    def idle(self, total: int = 0, weather: dict[str, Any] | None = None) -> Image.Image:
+    def idle(self, total: int = 0, weather: dict[str, Any] | None = None,
+             feed_active: bool | None = None) -> Image.Image:
         image = Image.new("RGB", (128, 64), "black")
         draw = ImageDraw.Draw(image)
         colors = self.colors()
@@ -578,16 +606,16 @@ class Renderer:
         draw.text((124 - draw.textlength(rain_text, font=self.f8), 32), rain_text, font=self.f8,
                   fill=colors["accent"] if rainy_day else colors["muted"])
         draw.text((4, 43), "SKYHI", font=self.f10, fill=colors["accent"])
-        status = f"{total} SIGNAL" + ("" if total == 1 else "S")
-        draw.text((124 - draw.textlength(status, font=self.f8), 45), status, font=self.f8,
-                  fill=colors["good"] if total else colors["muted"])
+        feed_label = "ADSB.FI DATA FEED"
+        feed_color = colors["good"] if feed_active else ("#FF4D4D" if feed_active is False else colors["muted"])
+        feed_x = 117 - draw.textlength(feed_label, font=self.f7)
+        draw.text((feed_x, 45), feed_label, font=self.f7, fill=feed_color)
+        # A compact, unambiguous pixel lamp: green means both feed and MLAT
+        # services are active; red means at least one service is down.
+        draw.rectangle((121, 47, 123, 49), fill=feed_color)
         heading = self.heading % 360
         scan_text = f"WATCHING {round(heading)}° {cardinal(heading)}"
         draw.text((4, 55), scan_text, font=self.f8, fill=colors["accent"])
-        # Keep this tiny indicator below the SIGNALS label. The previous
-        # 10-pixel peak reached into the final "S" on the physical matrix.
-        for index, height in enumerate((1, 2, 3, 4, 5)):
-            draw.rectangle((109 + index * 3, 62 - height, 110 + index * 3, 62), fill=colors["good"])
         return image
 
 
@@ -650,6 +678,7 @@ def main() -> int:
     cache = EnrichmentCache(APP_DIR / "cache" / "enrichment.sqlite3", int(config["route_cache_days"]), float(config["api_timeout_seconds"]))
     weather = WeatherCache(float(config["receiver_lat"]), float(config["receiver_lon"]),
                            int(config.get("weather_refresh_seconds", 300)))
+    adsbfi_health = ServiceHealth(("adsbfi-feed.service", "adsbfi-mlat.service"), 5.0)
     matrix = None if args.render_png else make_matrix(config)
     canvas = matrix.CreateFrameCanvas() if matrix else None
     locked_id: str | None = None
@@ -704,7 +733,7 @@ def main() -> int:
             page = args.page if args.page is not None else int((time.monotonic() - switched) / float(config.get("page_seconds", 5)))
             frame = renderer.aircraft(aircraft, extra, page)
         else:
-            frame = renderer.idle(len(payload.get("aircraft", [])), weather_data)
+            frame = renderer.idle(len(payload.get("aircraft", [])), weather_data, adsbfi_health.get())
         if args.render_png:
             frame.save(args.render_png)
             return 0
