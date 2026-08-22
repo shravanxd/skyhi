@@ -26,6 +26,7 @@
   "max_aircraft": 20,
   "max_seen_seconds": 45,
   "local_max_seen_seconds": 12,
+  "weather_refresh_seconds": 300,
   "brightness": 55,
   "display_color_mode": "classic",
   "notifications_enabled": false,

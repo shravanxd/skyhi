@@ -93,6 +93,7 @@ Copy [`flight-display/config.example.json`](flight-display/config.example.json) 
 | `target_release_nm` | Distance at which SkyHi releases a tracked flyover |
 | `brightness` | LED panel brightness from 10 to 100 percent |
 | `page_seconds` | Time spent on each aircraft page |
+| `weather_refresh_seconds` | Weather update interval, 300 seconds by default |
 
 FR24 credentials live outside the repository in `/home/shravanxd/.config/skyhi/fr24.env`. Never place the token in `config.json` or commit the environment file.
 

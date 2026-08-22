@@ -124,7 +124,7 @@ def friendly_aircraft_type(value: Any) -> str:
 class WeatherCache:
     """Fetch current local weather in the background without blocking frames."""
 
-    def __init__(self, lat: float, lon: float, refresh_seconds: int = 900):
+    def __init__(self, lat: float, lon: float, refresh_seconds: int = 300):
         self.lat, self.lon = lat, lon
         self.refresh_seconds = max(300, refresh_seconds)
         self.data: dict[str, Any] = {}
@@ -649,7 +649,7 @@ def main() -> int:
     )
     cache = EnrichmentCache(APP_DIR / "cache" / "enrichment.sqlite3", int(config["route_cache_days"]), float(config["api_timeout_seconds"]))
     weather = WeatherCache(float(config["receiver_lat"]), float(config["receiver_lon"]),
-                           int(config.get("weather_refresh_seconds", 900)))
+                           int(config.get("weather_refresh_seconds", 300)))
     matrix = None if args.render_png else make_matrix(config)
     canvas = matrix.CreateFrameCanvas() if matrix else None
     locked_id: str | None = None
