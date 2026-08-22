@@ -45,6 +45,7 @@ FIELDS: dict[str, tuple[type, float, float]] = {
     "brightness": (int, 10, 100),
     "receiver_heading_deg": (float, 0, 359.9),
     "window_field_of_view_deg": (float, 20, 360),
+    "adsbfi_poll_seconds": (int, 2, 60),
     "fr24_radius_nm": (float, 1, 50),
     "fr24_active_trigger_nm": (float, 1, 50),
     "fr24_active_poll_seconds": (int, 30, 1800),

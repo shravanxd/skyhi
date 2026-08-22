@@ -1,5 +1,5 @@
 [Unit]
-Description=SkyHi hybrid RTL-SDR and Flightradar24 aircraft source
+Description=SkyHi hybrid RTL-SDR, adsb.fi, and FR24 metadata source
 After=network-online.target
 Wants=network-online.target
 

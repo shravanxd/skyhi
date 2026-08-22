@@ -12,15 +12,16 @@ Useful local fields include ICAO hex, callsign, position, altitude, ground speed
 
 ### `skyhi-fr24`
 
-Reads the dump1090 feed, decides whether an aircraft is relevant, and polls FR24 only when needed. It writes a dump1090-compatible merged feed to `/run/skyhi-fr24/aircraft.json`.
+Reads the dump1090 feed, polls the nearby adsb.fi network view every five seconds, and uses FR24 only for missing metadata. It writes a dump1090-compatible merged feed to `/run/skyhi-fr24/aircraft.json`.
 
 Merge rules:
 
 1. Match aircraft by ICAO hex when possible.
 2. Prefer fresh local altitude, speed, track, position, and signal data.
-3. Add FR24 route, type, registration, and operator metadata.
-4. Keep local-only aircraft when no cloud match exists.
-5. Drop stale cloud positions after their configured freshness window.
+3. Use adsb.fi positions when the local antenna has not received an aircraft.
+4. Add cached FR24 route and operator metadata only when needed.
+5. Keep local-only aircraft when no cloud match exists.
+6. Drop stale network positions after their configured freshness window.
 
 The service keeps credit estimates in the user state directory and stores enrichment results so repeated sightings do not require repeated lookups.
 
@@ -52,7 +53,8 @@ The dashboard is protected by a six-digit local PIN. The stored record contains 
 
 ## External services
 
-- Flightradar24 supplies live identity and route metadata.
+- adsb.fi supplies continuous nearby network positions, altitude, speed, track, registration, and type when available.
+- Flightradar24 supplies one-shot identity and route enrichment when required.
 - Open-Meteo supplies current conditions and forecast data.
 - The US National Weather Service supplies severe-weather alerts when available.
 - OpenStreetMap tiles provide the dashboard map.
@@ -73,7 +75,8 @@ The LED display can continue operating with local ADS-B data if the internet is 
 
 ## Failure behavior
 
-- If FR24 fails, local aircraft continue to flow from dump1090.
+- If adsb.fi fails, local aircraft continue to flow from dump1090.
+- If FR24 fails, tracking continues and cached or available identity data is used.
 - If weather fails, the last good weather value remains available.
 - If no aircraft qualify, the panel returns to the idle screen.
 - systemd restarts application services after unexpected exits.

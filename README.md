@@ -6,14 +6,15 @@
 
 <p align="center">A tiny window into the very large sky.</p>
 
-SkyHi is a Raspberry Pi powered flight tracker that turns nearby aircraft into a live 128×64 LED display. It listens for ADS-B messages with an RTL-SDR, enriches flights with carefully budgeted Flightradar24 data, and picks the aircraft that actually matter to the view outside your window.
+SkyHi is a Raspberry Pi powered flight tracker that turns nearby aircraft into a live 128×64 LED display. It combines an RTL-SDR receiver with adsb.fi network coverage, enriches missing flight details with carefully budgeted Flightradar24 data, and picks the aircraft that actually matter to the view outside your window.
 
 This started as a side project built around one window, one antenna, and the question: "What plane is that?" It now has airline logos, routes, weather, a drawing-based tracking zone, a mobile control panel, automatic sleep hours, and enough tiny pixels to make every flyover feel like an event.
 
 ## What it does
 
 - Decodes local 1090 MHz ADS-B traffic with `dump1090-fa`
-- Combines fast local telemetry with richer Flightradar24 metadata
+- Combines fast local telemetry with continuous nearby adsb.fi network tracking
+- Uses cached, one-shot Flightradar24 requests only for missing metadata
 - Prioritizes aircraft inside a configurable window heading or map polygon
 - Displays airline, flight, route, aircraft model, altitude, speed, direction, and distance
 - Cycles between an identity page and a live metrics page
@@ -21,7 +22,7 @@ This started as a side project built around one window, one antenna, and the que
 - Scrolls long aircraft names such as `737 MAX 8`
 - Shows an idle screen with time, day, weather, and live adsb.fi feed health
 - Provides a phone-friendly dashboard at `http://skyhi.local:8080`
-- Tracks API credit usage and throttles polling to protect a fixed budget
+- Tracks FR24 credit usage and avoids routine paid polling
 - Starts automatically and recovers from crashes through systemd
 
 ## The hardware
@@ -42,13 +43,11 @@ The custom `seengreat` GPIO mapping is kept in [`vendor-patches/hardware-mapping
 RTL-SDR
    │
    ▼
-dump1090-fa ── local position, altitude, speed, track, signal
-   │
-   ├──────────────┐
-   ▼              ▼
-FR24 poller    Route and aircraft cache
-   │              │
-   └──────┬───────┘
+dump1090-fa ── local telemetry ──┐
+                                 │
+adsb.fi ───── continuous nearby ─┤
+                                 │
+FR24 ───────── cached metadata ──┘
           ▼
    merged aircraft.json
           │
@@ -60,7 +59,7 @@ LED renderer     Web control panel
 128×64 panel     Phone or computer
 ```
 
-The local receiver remains the preferred source for movement data. FR24 fills in identity, route, registration, and aircraft type when available. If cloud data is unavailable or the daily budget is exhausted, SkyHi continues with local ADS-B traffic.
+The local receiver remains the preferred source for movement data. adsb.fi fills reception gaps and sees aircraft throughout the configured tracking area. FR24 is used only for cached, one-time route and identity enrichment when needed. If either cloud source is unavailable, SkyHi continues with local ADS-B traffic.
 
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full data flow.
 
@@ -88,6 +87,8 @@ Copy [`flight-display/config.example.json`](flight-display/config.example.json) 
 | `receiver_heading_deg` | Direction the window faces |
 | `window_field_of_view_deg` | Width of the visible cone |
 | `tracking_polygon` | Optional map-drawn activation zone |
+| `adsbfi_poll_seconds` | Nearby adsb.fi refresh interval, 5 seconds by default |
+| `adsbfi_max_seen_seconds` | Reject stale network positions beyond this age |
 | `fr24_active_poll_seconds` | Poll interval while a local target is active |
 | `fr24_daily_credit_budget` | Daily safety cap for routine requests |
 | `target_release_nm` | Distance at which SkyHi releases a tracked flyover |
@@ -135,7 +136,7 @@ The web dashboard also provides live, idle, identity, metrics, grid, and solid-c
 ```text
 flight-display/
   skyhi_display.py       aircraft selection, enrichment, and LED rendering
-  fr24_poller.py         budget-aware hybrid data collector
+  fr24_poller.py         local + adsb.fi collector with FR24 enrichment
   control_panel.py       local dashboard API and service controls
   web/                   responsive control interface
   assets/logos/          bundled airline logo fallbacks

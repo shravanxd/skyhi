@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Poll FR24 live/full near the receiver and emit dump1090-compatible JSON."""
+"""Merge local ADS-B, adsb.fi network traffic, and cached FR24 metadata."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ import requests
 LOG = logging.getLogger("skyhi.fr24")
 STOP = Event()
 URL = "https://fr24api.flightradar24.com/api/live/flight-positions/full"
+ADSBFI_URL = "https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{dist}"
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -65,6 +66,30 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
         "operating_as": raw.get("operating_as"),
         "source": "fr24",
         "position_source": raw.get("source"),
+    }
+
+
+def normalize_adsbfi(raw: dict[str, Any]) -> dict[str, Any]:
+    """Normalize adsb.fi's readsb-compatible record for the display pipeline."""
+    return {
+        "hex": str(raw.get("hex") or "").lower(),
+        "flight": raw.get("flight"),
+        "lat": raw.get("lat"),
+        "lon": raw.get("lon"),
+        "alt_baro": raw.get("alt_baro"),
+        "alt_geom": raw.get("alt_geom"),
+        "gs": raw.get("gs"),
+        "track": raw.get("track"),
+        "baro_rate": raw.get("baro_rate"),
+        "squawk": raw.get("squawk"),
+        "seen": raw.get("seen", 0),
+        "seen_pos": raw.get("seen_pos"),
+        "rssi": raw.get("rssi", -100),
+        "messages": raw.get("messages", 1),
+        "aircraft_type": raw.get("t"),
+        "registration": raw.get("r"),
+        "source": "adsb.fi",
+        "position_source": raw.get("type"),
     }
 
 
@@ -141,16 +166,16 @@ def load_budget(path: Path) -> dict[str, Any]:
     return value
 
 
-def merge_hybrid(local: dict[str, Any], fr24: list[dict[str, Any]], metadata: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    """Merge on ICAO hex, preferring fast local movement and FR24 metadata."""
+def merge_hybrid(local: dict[str, Any], network: list[dict[str, Any]], metadata: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Merge on ICAO hex, preferring fast local movement and cached metadata."""
     metadata = metadata or {}
-    merged = {str(item.get("hex", "")).lower(): dict(item) for item in fr24 if item.get("hex")}
+    merged = {str(item.get("hex", "")).lower(): dict(item) for item in network if item.get("hex")}
     callsigns = {str(item.get("flight") or "").strip(): key for key, item in merged.items() if item.get("flight")}
     for local_item in local.get("aircraft", []):
         hex_code = str(local_item.get("hex", "")).lower()
         callsign = str(local_item.get("flight") or "").strip()
         key = hex_code if hex_code in merged else callsigns.get(callsign, hex_code)
-        already_fr24 = key in merged
+        already_network = key in merged
         base = merged.get(key, {})
         cached = metadata.get(callsign) or metadata.get(hex_code) or {}
         cached_item = cached.get("item", {}) if isinstance(cached, dict) else {}
@@ -160,7 +185,7 @@ def merge_hybrid(local: dict[str, Any], fr24: list[dict[str, Any]], metadata: di
         for field in ("hex", "flight", "lat", "lon", "alt_baro", "alt_geom", "gs", "track", "baro_rate", "squawk", "seen", "rssi", "messages"):
             if local_item.get(field) is not None:
                 base[field] = local_item[field]
-        base["source"] = "local+fr24" if already_fr24 else "local"
+        base["source"] = "local+adsb.fi" if already_network else "local"
         merged[key or callsign] = base
     return list(merged.values())
 
@@ -177,8 +202,8 @@ def main() -> int:
         raise SystemExit("FR24_API_TOKEN is not configured")
     lat, lon = float(config["receiver_lat"]), float(config["receiver_lon"])
     radius = float(config.get("fr24_radius_nm", 15))
-    interval = max(10.0, float(config.get("fr24_poll_seconds", 30)))
-    limit = max(1, int(config.get("fr24_result_limit", 8)))
+    adsbfi_interval = max(2.0, float(config.get("adsbfi_poll_seconds", 5)))
+    adsbfi_max_seen = max(5.0, float(config.get("adsbfi_max_seen_seconds", 20)))
     active_interval = max(30.0, float(config.get("fr24_active_poll_seconds", 30)))
     active_limit = max(1, int(config.get("fr24_active_result_limit", 1)))
     active_trigger = float(config.get("fr24_active_trigger_nm", 8))
@@ -193,10 +218,15 @@ def main() -> int:
     session = requests.Session()
     fr24_aircraft: list[dict[str, Any]] = []
     next_fr24 = 0.0
+    network_aircraft: list[dict[str, Any]] = []
+    next_adsbfi = 0.0
     while not STOP.is_set():
         now = time.monotonic()
         local = load_json(local_path)
-        active_target = active_local_target(local, lat, lon, active_trigger, tracking_polygon)
+        # A network-only aircraft entering the selected area can trigger the
+        # same one-time FR24 metadata enrichment as a locally received target.
+        tracking_input = {"aircraft": merge_hybrid(local, network_aircraft)}
+        active_target = active_local_target(tracking_input, lat, lon, active_trigger, tracking_polygon)
         active = active_target is not None
         # A newly seen local flight gets one immediate metadata lookup even if
         # routine polling is paused by the daily budget. Cache both hits and
@@ -251,43 +281,31 @@ def main() -> int:
                 except Exception as exc:
                     LOG.error("FR24 one-shot enrichment failed for %s: %s", enrichment_key, exc)
                     enrichment_retry_after[enrichment_key] = time.time() + 300
-        if active and next_fr24 - now > active_interval:
-            next_fr24 = now + active_interval
-        if now >= next_fr24:
-            budget = load_budget(budget_path)
-            if int(budget.get("credits", 0)) >= daily_budget:
-                LOG.warning("Daily FR24 budget reached (%s/%s); using local receiver only", budget.get("credits"), daily_budget)
-                next_fr24 = now + interval
-            else:
-                try:
-                    request_limit = active_limit if active else limit
-                    params: dict[str, Any] = {"bounds": bounds(lat, lon, radius), "limit": request_limit}
-                    if active_target and active_target.get("flight"):
-                        params["callsigns"] = str(active_target["flight"]).strip()
-                    response = session.get(URL, headers=headers, params=params, timeout=8)
-                    response.raise_for_status()
-                    fr24_aircraft = [normalize(row) for row in response.json().get("data", [])]
-                    for item in fr24_aircraft:
-                        item["_seen_at_poll"] = float(item.get("seen", 0))
-                        item["_cached_at"] = now
-                    charged = max(1, len(fr24_aircraft) * 8)
-                    budget["credits"] = int(budget.get("credits", 0)) + charged
-                    budget["calls"] = int(budget.get("calls", 0)) + 1
-                    budget["last_success"] = time.time()
-                    atomic_json(budget_path, budget)
-                    LOG.info("FR24 %s poll: %d aircraft, estimated daily credits %d/%d", "active" if active else "idle", len(fr24_aircraft), budget["credits"], daily_budget)
-                except Exception as exc:
-                    LOG.error("FR24 poll failed: %s", exc)
-                next_fr24 = now + (active_interval if active else interval)
-        current_fr24 = []
-        for cached in fr24_aircraft:
+        if now >= next_adsbfi:
+            try:
+                url = ADSBFI_URL.format(lat=lat, lon=lon, dist=radius)
+                response = session.get(url, headers={"Accept": "application/json", "User-Agent": "SkyHi/1.0"}, timeout=8)
+                response.raise_for_status()
+                payload = response.json()
+                rows = payload.get("ac", payload.get("aircraft", []))
+                network_aircraft = [normalize_adsbfi(row) for row in rows]
+                network_aircraft = [item for item in network_aircraft
+                                    if float(item.get("seen_pos") or item.get("seen") or 999) <= adsbfi_max_seen]
+                for item in network_aircraft:
+                    item["_cached_at"] = now
+                LOG.info("adsb.fi poll: %d fresh nearby aircraft", len(network_aircraft))
+            except Exception as exc:
+                LOG.error("adsb.fi poll failed; retaining last snapshot: %s", exc)
+            next_adsbfi = now + adsbfi_interval
+
+        current_network = []
+        for cached in network_aircraft:
             item = dict(cached)
-            item["seen"] = float(item.get("_seen_at_poll", 0)) + max(0.0, now - float(item.get("_cached_at", now)))
-            item.pop("_seen_at_poll", None)
-            item.pop("_cached_at", None)
-            current_fr24.append(item)
-        aircraft = merge_hybrid(local, current_fr24, metadata)
-        atomic_json(Path(args.output), {"now": time.time(), "messages": len(aircraft), "source": "hybrid", "aircraft": aircraft})
+            item["seen"] = float(item.get("seen", 0)) + max(0.0, now - float(item.pop("_cached_at", now)))
+            current_network.append(item)
+        aircraft = merge_hybrid(local, current_network, metadata)
+        atomic_json(Path(args.output), {"now": time.time(), "messages": len(aircraft),
+                                       "source": "local+adsb.fi", "aircraft": aircraft})
         STOP.wait(1.0)
     return 0
 

@@ -627,7 +627,7 @@ def select_aircraft(payload: dict[str, Any], config: dict[str, Any]) -> list[dic
     half_fov = float(config.get("window_field_of_view_deg", 120)) / 2
     for raw in payload.get("aircraft", []):
         source = str(raw.get("source") or "")
-        freshness = float(config.get("local_max_seen_seconds", 12)) if source in ("local", "local+fr24") else float(config["max_seen_seconds"])
+        freshness = float(config.get("local_max_seen_seconds", 12)) if source in ("local", "local+fr24", "local+adsb.fi") else float(config["max_seen_seconds"])
         if float(raw.get("seen", 999)) > freshness:
             continue
         if not clean_callsign(raw.get("flight")) or raw.get("lat") is None or raw.get("lon") is None:
