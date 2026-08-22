@@ -1,0 +1,16 @@
+[Unit]
+Description=SkyHi LED flight display
+Requires=skyhi-fr24.service dump1090-fa.service
+After=skyhi-fr24.service dump1090-fa.service network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/skyhi/flight-display
+ExecStart=/opt/skyhi/flight-display/.venv/bin/python /opt/skyhi/flight-display/skyhi_display.py --config /opt/skyhi/flight-display/config.json
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

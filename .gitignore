@@ -1,0 +1,31 @@
+# Local configuration and secrets
+flight-display/config.json
+*.env
+.env*
+
+# Runtime state
+system/fr24-budget.json
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated previews and local photos
+/*.png
+/*.jpg
+/tests/*.png
+
+# Local design and editor state
+.design-rules/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+AGENTS.md

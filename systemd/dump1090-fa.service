@@ -1,0 +1,18 @@
+[Unit]
+Description=SkyHi local ADS-B decoder
+After=network.target
+
+[Service]
+Type=simple
+User=dump1090
+Group=dump1090
+SupplementaryGroups=plugdev
+RuntimeDirectory=dump1090-fa
+RuntimeDirectoryMode=0755
+ExecStart=/opt/skyhi/dump1090-fa/dump1090 --device-index 0 --gain -10 --adaptive-range --net --net-heartbeat 60 --write-json /run/dump1090-fa --write-json-every 1 --quiet
+Restart=on-failure
+RestartSec=3
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

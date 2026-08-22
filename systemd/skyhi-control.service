@@ -1,0 +1,14 @@
+[Unit]
+Description=SkyHi local web control panel
+After=network.target skyhi-flight-display.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/skyhi/flight-display
+ExecStart=/usr/bin/python3 /opt/skyhi/flight-display/control_panel.py --port 8080
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
