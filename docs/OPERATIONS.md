@@ -14,6 +14,7 @@ The web control service is intentionally separate from the three power services.
 
 ```bash
 systemctl is-active dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
+systemctl is-active adsbfi-feed adsbfi-mlat
 stat /run/dump1090-fa/aircraft.json
 stat /run/skyhi-fr24/aircraft.json
 journalctl -u skyhi-flight-display --since "10 minutes ago" --no-pager
@@ -47,15 +48,30 @@ sudo systemctl status skyhi-fr24
 sudo journalctl -u skyhi-fr24 -n 100 --no-pager
 ```
 
-SkyHi makes a one-shot enrichment request for a new local contact that lacks metadata. A response can still be empty if the provider has no matching record.
+SkyHi makes a cached, one-shot FR24 enrichment request for a local or adsb.fi contact inside the active tracking area when route metadata is missing. A response can still be empty if the provider has no matching record.
 
-### Credit use is higher than expected
+### adsb.fi network aircraft are missing
 
-- Increase the active and idle polling intervals.
-- Reduce the FR24 result limit and search radius.
-- Use a polygon or narrower field of view.
-- Lower the daily budget in the dashboard.
-- Compare SkyHi's estimate with the FR24 account dashboard.
+```bash
+curl -fsS "https://opendata.adsb.fi/api/v3/lat/LAT/lon/LON/dist/6" | jq '.ac | length'
+sudo journalctl -u skyhi-fr24 -n 100 --no-pager
+```
+
+Replace `LAT` and `LON` with the receiver location. The public endpoint is limited to one request per second. SkyHi defaults to five seconds normally and two seconds while a target is active. Do not configure the close interval below one second.
+
+### FR24 credit use is higher than expected
+
+- Confirm the deployed poller is the current adsb.fi hybrid version.
+- Look for `FR24 one-shot enrichment` in the `skyhi-fr24` journal.
+- Repeated sightings should use the local enrichment cache.
+- Use a polygon or narrower activation radius to limit which aircraft need routes.
+- Compare SkyHi's estimate with the FR24 account dashboard, which is authoritative.
+
+Continuous position tracking does not use FR24 credits. Only missing metadata enrichment does.
+
+### Speed or altitude pauses briefly
+
+Local RTL-SDR values are merged every second and take priority. Network-only targets refresh every five seconds normally or every two seconds inside the active area. Aircraft transponders may transmit individual fields at different times, so an unchanged value is not necessarily a fault. SkyHi does not invent movement between reports.
 
 ## Backups
 

@@ -67,7 +67,7 @@ The LED display can continue operating with local ADS-B data if the internet is 
 | --- | --- | --- |
 | `/opt/skyhi/flight-display` | deployment | Application code and virtual environment |
 | `/run/dump1090-fa/aircraft.json` | dump1090 | Local aircraft feed |
-| `/run/skyhi-fr24/aircraft.json` | FR24 poller | Hybrid aircraft feed |
+| `/run/skyhi-fr24/aircraft.json` | hybrid collector | Local and network aircraft feed |
 | `/run/skyhi-weather.json` | display | Cached weather for the UI |
 | `~/.config/skyhi/fr24.env` | administrator | FR24 API token |
 | `~/.config/skyhi/control-auth.json` | control service | PIN hash and session secret |

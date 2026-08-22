@@ -61,7 +61,7 @@ LED renderer     Web control panel
 
 The local receiver remains the preferred source for movement data. adsb.fi fills reception gaps and sees aircraft throughout the configured tracking area. FR24 is used only for cached, one-time route and identity enrichment when needed. If either cloud source is unavailable, SkyHi continues with local ADS-B traffic.
 
-Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full data flow.
+Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the service layout and [`docs/TRACKING.md`](docs/TRACKING.md) for source priority, polling cadence, target selection, and failure behavior.
 
 ## Quick start
 

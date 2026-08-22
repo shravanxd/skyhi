@@ -69,6 +69,13 @@ nano config.json
 
 At minimum, set the receiver latitude, longitude, heading, and field of view. `config.json` is excluded from Git so the receiver location stays local.
 
+The default tracking cadence is:
+
+- local dump1090 merge every second
+- adsb.fi nearby scan every five seconds
+- adsb.fi active-target scan every two seconds
+- FR24 only when an active aircraft lacks cached route or identity metadata
+
 Create the FR24 environment file:
 
 ```bash
@@ -107,3 +114,16 @@ systemctl status dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
 ```
 
 Use the dashboard preview before running solid-color tests on the physical panel.
+
+The merged feed should report `local+adsb.fi` at the document level. Individual aircraft report `local`, `adsb.fi`, or `local+adsb.fi` depending on which observations were available.
+
+## 8. Optional adsb.fi feeder
+
+SkyHi can contribute the receiver's Beast data to adsb.fi. Install the official feeder scripts separately and configure their input as `127.0.0.1:30005`. Feeding is independent of the open-data tracking API, so a feeder outage does not stop the LED display from reading local dump1090 data.
+
+After setup, verify both components:
+
+```bash
+systemctl is-active adsbfi-feed adsbfi-mlat
+journalctl -u adsbfi-feed -u adsbfi-mlat -n 50 --no-pager
+```
