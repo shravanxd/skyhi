@@ -88,6 +88,7 @@ Copy [`flight-display/config.example.json`](flight-display/config.example.json) 
 | `window_field_of_view_deg` | Width of the visible cone |
 | `tracking_polygon` | Optional map-drawn activation zone |
 | `adsbfi_poll_seconds` | Nearby adsb.fi refresh interval, 5 seconds by default |
+| `adsbfi_close_poll_seconds` | Faster network refresh inside the active area, 2 seconds by default |
 | `adsbfi_max_seen_seconds` | Reject stale network positions beyond this age |
 | `fr24_active_poll_seconds` | Poll interval while a local target is active |
 | `fr24_daily_credit_budget` | Daily safety cap for routine requests |

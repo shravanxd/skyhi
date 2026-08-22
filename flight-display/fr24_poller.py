@@ -203,6 +203,7 @@ def main() -> int:
     lat, lon = float(config["receiver_lat"]), float(config["receiver_lon"])
     radius = float(config.get("fr24_radius_nm", 15))
     adsbfi_interval = max(2.0, float(config.get("adsbfi_poll_seconds", 5)))
+    adsbfi_close_interval = max(1.0, float(config.get("adsbfi_close_poll_seconds", 2)))
     adsbfi_max_seen = max(5.0, float(config.get("adsbfi_max_seen_seconds", 20)))
     active_interval = max(30.0, float(config.get("fr24_active_poll_seconds", 30)))
     active_limit = max(1, int(config.get("fr24_active_result_limit", 1)))
@@ -296,7 +297,10 @@ def main() -> int:
                 LOG.info("adsb.fi poll: %d fresh nearby aircraft", len(network_aircraft))
             except Exception as exc:
                 LOG.error("adsb.fi poll failed; retaining last snapshot: %s", exc)
-            next_adsbfi = now + adsbfi_interval
+            # Aircraft in the selected view get a faster network refresh.
+            # The local receiver is still merged every second and remains the
+            # preferred source whenever it has a fresh observation.
+            next_adsbfi = now + (adsbfi_close_interval if active else adsbfi_interval)
 
         current_network = []
         for cached in network_aircraft:
