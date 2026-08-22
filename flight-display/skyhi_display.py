@@ -606,7 +606,7 @@ class Renderer:
         draw.text((124 - draw.textlength(rain_text, font=self.f8), 32), rain_text, font=self.f8,
                   fill=colors["accent"] if rainy_day else colors["muted"])
         draw.text((4, 43), "SKYHI", font=self.f10, fill=colors["accent"])
-        feed_label = "ADSB.FI DATA FEED"
+        feed_label = "ADSB DATA FEED"
         feed_color = colors["good"] if feed_active else ("#FF4D4D" if feed_active is False else colors["muted"])
         feed_x = 117 - draw.textlength(feed_label, font=self.f7)
         draw.text((feed_x, 45), feed_label, font=self.f7, fill=feed_color)
