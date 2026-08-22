@@ -594,7 +594,9 @@ class Renderer:
         for letter in now.strftime("%a").upper():
             draw.text((date_x, 19), letter, font=self.f8, fill=colors["muted"])
             date_x += draw.textlength(letter, font=self.f8) + 1
-        draw.text((date_x + 1, 19), now.strftime("%b %d").upper(), font=self.f8, fill=colors["muted"])
+        # Leave a full dark LED column between the custom-spaced weekday and
+        # the month so labels such as "SAT AUG" cannot visually merge.
+        draw.text((date_x + 3, 19), now.strftime("%b %d").upper(), font=self.f8, fill=colors["muted"])
         condition = self.fit(draw, condition, self.f8, 66)
         draw.text((124 - draw.textlength(condition, font=self.f8), 19), condition, font=self.f8, fill=weather_color)
         draw.line((4, 30, 123, 30), fill=colors["line"])
