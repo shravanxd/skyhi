@@ -608,12 +608,12 @@ class Renderer:
         draw.text((124 - draw.textlength(rain_text, font=self.f8), 32), rain_text, font=self.f8,
                   fill=colors["accent"] if rainy_day else colors["muted"])
         draw.text((4, 43), "SKYHI", font=self.f10, fill=colors["accent"])
-        feed_label = "ADSB DATA FEED"
+        signal_label = f"{total} SIGNAL{'S' if total != 1 else ''}"
         feed_color = colors["good"] if feed_active else ("#FF4D4D" if feed_active is False else colors["muted"])
-        feed_x = 117 - draw.textlength(feed_label, font=self.f7)
-        draw.text((feed_x, 45), feed_label, font=self.f7, fill=feed_color)
-        # A compact, unambiguous pixel lamp: green means both feed and MLAT
-        # services are active; red means at least one service is down.
+        signal_x = 116 - draw.textlength(signal_label, font=self.f7)
+        draw.text((signal_x, 45), signal_label, font=self.f7, fill=colors["soft"])
+        # Keep feed health visually secondary: the aircraft count carries the
+        # useful label while this isolated lamp quietly reports service state.
         draw.rectangle((121, 47, 123, 49), fill=feed_color)
         heading = self.heading % 360
         scan_text = f"WATCHING {round(heading)}° {cardinal(heading)}"
