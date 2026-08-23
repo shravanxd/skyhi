@@ -403,6 +403,26 @@ class Renderer:
         strip_draw.text((text_width + gap - offset, 0), text, font=font, fill=fill)
         image.paste(strip, position)
 
+    @staticmethod
+    def logo_viewport(logo: Image.Image, width: int, height: int,
+                      speed: float = 7.0) -> Image.Image:
+        """Fit a logo in a clipped viewport, sliding wide wordmarks end to end."""
+        available_height = max(1, height - 4)
+        scale = available_height / logo.height
+        rendered = logo.resize((max(1, round(logo.width * scale)), available_height),
+                               Image.Resampling.LANCZOS)
+        viewport = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        y = (height - rendered.height) // 2
+        if rendered.width <= width - 4:
+            viewport.alpha_composite(rendered, ((width - rendered.width) // 2, y))
+            return viewport
+
+        overflow = rendered.width - width
+        phase = int(time.monotonic() * speed) % max(1, overflow * 2)
+        offset = phase if phase <= overflow else overflow * 2 - phase
+        viewport.alpha_composite(rendered, (-offset, y))
+        return viewport
+
     def logo(self, code: str) -> Image.Image | None:
         if code in self.logo_cache:
             return self.logo_cache[code].copy()
@@ -416,12 +436,11 @@ class Renderer:
             bbox = logo.getchannel("A").getbbox()
             if bbox:
                 logo = logo.crop(bbox)
-            # Most source assets are emblem + wide wordmark. On this tiny panel
-            # the emblem alone is much more recognizable, so take the leading
-            # square from very wide images (e.g. Delta, United, Southwest).
-            if logo.width > logo.height * 1.6:
-                logo = logo.crop((0, 0, min(logo.height, logo.width), logo.height))
-            logo.thumbnail((36, 35), Image.Resampling.LANCZOS)
+            # Preserve complete wide wordmarks. The page-specific viewport
+            # keeps compact marks still and scrolls only artwork that overflows.
+            if logo.height > 35:
+                scale = 35 / logo.height
+                logo = logo.resize((max(1, round(logo.width * scale)), 35), Image.Resampling.LANCZOS)
 
             # Pick a contrasting tile from the visible logo pixels. Many
             # aviation assets contain navy/black artwork intended for white
@@ -439,10 +458,8 @@ class Renderer:
                     boost = max(0, 135 - pixel_luma)
                     lifted.append((min(255, int(r + boost)), min(255, int(g + boost)), min(255, int(b + boost)), a))
                 logo.putdata(lifted)
-            tile = Image.new("RGBA", (42, 41), (0, 0, 0, 0))
-            tile.alpha_composite(logo, ((42 - logo.width) // 2, (41 - logo.height) // 2))
-            self.logo_cache[code] = tile
-            return tile.copy()
+            self.logo_cache[code] = logo
+            return logo.copy()
         except (OSError, StopIteration):
             return None
 
@@ -456,7 +473,8 @@ class Renderer:
         brand = "#" + color
         logo = self.logo(code)
         if logo:
-            image.paste(logo, (1, 1), logo)
+            logo_frame = self.logo_viewport(logo, 42, 41)
+            image.paste(logo_frame, (1, 1), logo_frame)
         else:
             draw.rounded_rectangle((3, 4, 39, 38), radius=4, fill=brand)
             mark = self.fit(draw, mark, self.f14, 32)
@@ -491,8 +509,8 @@ class Renderer:
         airline, mark, color = self.airline(callsign)
         logo = self.logo(callsign[:3])
         if logo:
-            logo.thumbnail((25, 23), Image.Resampling.LANCZOS)
-            image.paste(logo, ((26 - logo.width) // 2, 1), logo)
+            logo_frame = self.logo_viewport(logo, 26, 25, speed=5.0)
+            image.paste(logo_frame, (0, 0), logo_frame)
         else:
             brand = "#" + color
             draw.rounded_rectangle((1, 2, 25, 23), radius=3, fill=brand)
