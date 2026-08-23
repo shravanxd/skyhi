@@ -524,7 +524,7 @@ class Renderer:
         draw.line((0, 27, 127, 27), fill=colors["line"])
 
         altitude = item.get("alt_baro", item.get("alt_geom"))
-        alt_text = "GROUND" if altitude == "ground" else (f"{int(float(altitude)):,} ft" if altitude is not None else "-- ft")
+        alt_text = "GROUND" if altitude == "ground" else (f"{int(float(altitude)):,}" if altitude is not None else "--")
         speed = item.get("gs")
         speed_text = f"{int(round(float(speed)))} kt" if speed is not None else "-- kt"
         direction = cardinal(item.get("track"))
@@ -532,7 +532,7 @@ class Renderer:
         distance = item.get("_distance_nm")
         distance_text = f"{distance:.1f}" if isinstance(distance, float) else "--"
 
-        draw.text((2, 29), "ALT", font=self.f8, fill=colors["muted"])
+        draw.text((2, 29), "ALT - ft", font=self.f8, fill=colors["muted"])
         draw.text((2, 38), alt_text, font=self.f10, fill=colors["warm"])
         draw.text((51, 29), "SPEED", font=self.f8, fill=colors["muted"])
         draw.text((51, 38), speed_text, font=self.f10, fill=colors["good"])
