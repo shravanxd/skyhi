@@ -404,24 +404,18 @@ class Renderer:
         image.paste(strip, position)
 
     @staticmethod
-    def logo_viewport(logo: Image.Image, width: int, height: int,
-                      speed: float = 7.0) -> Image.Image:
-        """Fit a logo in a clipped viewport, sliding wide wordmarks end to end."""
-        available_height = max(1, height - 4)
-        scale = available_height / logo.height
-        rendered = logo.resize((max(1, round(logo.width * scale)), available_height),
+    def logo_frame(logo: Image.Image, width: int, height: int) -> Image.Image:
+        """Contain the complete logo in a padded, static viewport."""
+        available_width = max(1, width - 6)
+        available_height = max(1, height - 6)
+        scale = min(available_width / logo.width, available_height / logo.height)
+        rendered = logo.resize((max(1, round(logo.width * scale)),
+                                max(1, round(logo.height * scale))),
                                Image.Resampling.LANCZOS)
-        viewport = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        y = (height - rendered.height) // 2
-        if rendered.width <= width - 4:
-            viewport.alpha_composite(rendered, ((width - rendered.width) // 2, y))
-            return viewport
-
-        overflow = rendered.width - width
-        phase = int(time.monotonic() * speed) % max(1, overflow * 2)
-        offset = phase if phase <= overflow else overflow * 2 - phase
-        viewport.alpha_composite(rendered, (-offset, y))
-        return viewport
+        frame = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        frame.alpha_composite(rendered, ((width - rendered.width) // 2,
+                                         (height - rendered.height) // 2))
+        return frame
 
     def logo(self, code: str) -> Image.Image | None:
         if code in self.logo_cache:
@@ -436,8 +430,8 @@ class Renderer:
             bbox = logo.getchannel("A").getbbox()
             if bbox:
                 logo = logo.crop(bbox)
-            # Preserve complete wide wordmarks. The page-specific viewport
-            # keeps compact marks still and scrolls only artwork that overflows.
+            # Preserve complete wide wordmarks. The page-specific frame scales
+            # them proportionally to fit instead of cropping or animating them.
             if logo.height > 35:
                 scale = 35 / logo.height
                 logo = logo.resize((max(1, round(logo.width * scale)), 35), Image.Resampling.LANCZOS)
@@ -473,7 +467,7 @@ class Renderer:
         brand = "#" + color
         logo = self.logo(code)
         if logo:
-            logo_frame = self.logo_viewport(logo, 42, 41)
+            logo_frame = self.logo_frame(logo, 42, 41)
             image.paste(logo_frame, (1, 1), logo_frame)
         else:
             draw.rounded_rectangle((3, 4, 39, 38), radius=4, fill=brand)
@@ -509,7 +503,7 @@ class Renderer:
         airline, mark, color = self.airline(callsign)
         logo = self.logo(callsign[:3])
         if logo:
-            logo_frame = self.logo_viewport(logo, 26, 25, speed=5.0)
+            logo_frame = self.logo_frame(logo, 26, 25)
             image.paste(logo_frame, (0, 0), logo_frame)
         else:
             brand = "#" + color
