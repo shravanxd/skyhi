@@ -345,10 +345,12 @@ class EnrichmentCache:
 
 
 class Renderer:
-    def __init__(self, airlines: dict[str, list[str]], color_mode: str = "classic", heading: float = 148):
+    def __init__(self, airlines: dict[str, list[str]], color_mode: str = "classic",
+                 heading: float = 148, tracking_range_nm: float = 6):
         self.airlines = airlines
         self.color_mode = color_mode
         self.heading = heading
+        self.tracking_range_nm = tracking_range_nm
         font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
         bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         self.f8 = ImageFont.truetype(font, 8)
@@ -630,6 +632,9 @@ class Renderer:
         heading = self.heading % 360
         scan_text = f"WATCHING {round(heading)}° {cardinal(heading)}"
         draw.text((4, 55), scan_text, font=self.f8, fill=colors["accent"])
+        range_text = f"{self.tracking_range_nm:g} NM"
+        range_x = 124 - draw.textlength(range_text, font=self.f8)
+        draw.text((range_x, 55), range_text, font=self.f8, fill=colors["muted"])
         return image
 
 
@@ -688,6 +693,7 @@ def main() -> int:
         load_json(APP_DIR / "airlines.json", {}),
         str(config.get("display_color_mode", "classic")),
         float(config.get("receiver_heading_deg") or 148),
+        float(config.get("fr24_radius_nm") or 6),
     )
     cache = EnrichmentCache(APP_DIR / "cache" / "enrichment.sqlite3", int(config["route_cache_days"]), float(config["api_timeout_seconds"]))
     weather = WeatherCache(float(config["receiver_lat"]), float(config["receiver_lon"]),

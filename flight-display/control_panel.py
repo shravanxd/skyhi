@@ -243,7 +243,7 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(urlparse(self.path).query)
         mode = query.get("mode", ["live"])[0]
         config = read_json(CONFIG_PATH, {})
-        renderer = Renderer(read_json(APP_DIR / "airlines.json", {}), str(config.get("display_color_mode", "classic")), float(config.get("receiver_heading_deg") or 148))
+        renderer = Renderer(read_json(APP_DIR / "airlines.json", {}), str(config.get("display_color_mode", "classic")), float(config.get("receiver_heading_deg") or 148), float(config.get("fr24_radius_nm") or 6))
         payload = read_json(AIRCRAFT_PATH, {})
         aircraft = next((item for item in payload.get("aircraft", []) if str(item.get("flight") or "").strip()), None)
         if mode == "idle" or aircraft is None:
