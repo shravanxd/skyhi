@@ -842,8 +842,9 @@ def main() -> int:
         tracked_normal_seconds = max(5, float(tracked_state.get("normal_seconds", 15)))
         tracked_block = tracked_screen_seconds * 3
         tracked_cycle = tracked_block + tracked_normal_seconds
-        tracked_phase = (time.time() - float(tracked_state.get("started_at") or time.time())) % tracked_cycle
-        show_tracked = bool(tracked_state.get("active") and time.time() - float(tracked_state.get("updated", 0)) < 30
+        tracked_phase = (time.time() - float(tracked_state.get("ready_at") or time.time())) % tracked_cycle
+        show_tracked = bool(tracked_state.get("active") and tracked_state.get("ready")
+                            and time.time() - float(tracked_state.get("updated", 0)) < 30
                             and tracked_phase < tracked_block)
         if show_tracked:
             tracked_page = min(2, int(tracked_phase / tracked_screen_seconds))

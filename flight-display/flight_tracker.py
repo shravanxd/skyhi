@@ -201,6 +201,7 @@ def main() -> int:
     ground_count = 0
     last_status = "SEARCHING"
     last_fresh = 0.0
+    ready_at = 0.0
 
     while not STOP.is_set():
         now = time.time()
@@ -224,6 +225,7 @@ def main() -> int:
             geo_lat = geo_lon = None
             missing_since = ground_count = 0
             last_status, last_fresh = "SEARCHING", 0
+            ready_at = 0
             LOG.info("Tracking requested for %s", callsign)
 
         if now >= next_poll:
@@ -327,8 +329,25 @@ def main() -> int:
             status = "EN ROUTE"
         last_status = status
 
+        required = {
+            "position": lat is not None and lon is not None,
+            "altitude": altitude is not None,
+            "speed": speed is not None,
+            "heading": aircraft.get("track") is not None,
+            "route": bool(origin.get("code") and destination.get("code")),
+            "journey": progress is not None and remaining_nm is not None,
+            "eta": eta_seconds is not None,
+            "location": bool(location.get("primary")),
+        }
+        missing_fields = [name for name, available in required.items() if not available]
+        ready = not missing_fields
+        if ready and not ready_at:
+            ready_at = now
+
         state = {
-            "active": True, "callsign": callsign, "started_at": request.get("started_at"),
+            "active": True, "ready": ready, "ready_at": ready_at or None,
+            "missing_fields": missing_fields, "callsign": callsign,
+            "started_at": request.get("started_at"),
             "until_landing": bool(request.get("until_landing")), "expires_at": expires,
             "screen_seconds": request.get("screen_seconds", 5), "normal_seconds": request.get("normal_seconds", 15),
             "status": status, "progress": progress, "remaining_nm": remaining_nm,

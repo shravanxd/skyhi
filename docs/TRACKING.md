@@ -73,6 +73,8 @@ Some `fr24_*` names remain in configuration and service paths to preserve existi
 
 A focused flight is independent of the receiver's radius and polygon. The selected exact callsign is requested from adsb.fi every five seconds, so it can remain visible across the country or an ocean. The local nearby feed continues running in parallel.
 
+Focused screens are readiness-gated. SkyHi keeps the normal nearby-aircraft or idle loop visible while it resolves position, altitude, speed, heading, route, journey progress, ETA, and location. The focused three-screen sequence starts at page one only after every required field is available, so calculation placeholders are never shown on the LED panel.
+
 Journey completion uses great-circle distance between resolved origin and destination airport coordinates. Time to destination prefers the FR24 estimated arrival time when supplied and falls back to remaining distance divided by current ground speed. Both values are estimates and can change with routing, holding, wind, or air traffic control instructions.
 
 Status is derived from real telemetry:
