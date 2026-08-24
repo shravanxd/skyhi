@@ -234,7 +234,11 @@ def main() -> int:
                 rows = response.json().get("ac", [])
                 exact = next((row for row in rows if str(row.get("flight") or "").strip().upper() == callsign), rows[0] if rows else None)
                 if exact:
-                    aircraft = normalize_adsb(exact)
+                    update = normalize_adsb(exact)
+                    # Sparse ocean ADS-B records can omit speed or heading.
+                    # Refresh available fields without erasing richer FR24 data.
+                    aircraft = {**aircraft, **{key: value for key, value in update.items()
+                                               if value is not None and value != ""}}
                     last_fresh = now
                     missing_since = 0
                 elif not missing_since:
@@ -253,8 +257,8 @@ def main() -> int:
                     response = session.get(FR24_URL, headers=headers, params=params, timeout=8)
                     response.raise_for_status()
                     row = (response.json().get("data") or [{}])[0]
-                    if row and not aircraft:
-                        aircraft = normalize_fr24(row)
+                    if row:
+                        aircraft = {**normalize_fr24(row), **aircraft}
                         last_fresh = now
                         missing_since = 0
                     metadata = {
