@@ -20,6 +20,15 @@ class FlightTrackerTests(unittest.TestCase):
         self.assertEqual(item["flight"], "UAL1")
         self.assertEqual(item["aircraft_type"], "B38M")
 
+    def test_fr24_record_is_normalized_for_worldwide_fallback(self):
+        item = TRACKER.normalize_fr24({"callsign": "IBE03VV", "lat": 43.8, "lon": -60.9,
+                                      "alt": 35000, "gspeed": 495, "track": 77,
+                                      "type": "A21N", "reg": "EC-OIL"})
+        self.assertEqual(item["flight"], "IBE03VV")
+        self.assertEqual(item["alt_baro"], 35000)
+        self.assertEqual(item["gs"], 495)
+        self.assertEqual(item["source"], "fr24")
+
     def test_ocean_labels_are_directional(self):
         self.assertEqual(TRACKER.ocean_name(45, -35), "North Atlantic")
         self.assertEqual(TRACKER.ocean_name(-20, 80), "Indian Ocean")

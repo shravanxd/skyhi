@@ -121,6 +121,8 @@ def reverse_location(session: requests.Session, lat: float, lon: float) -> dict[
         country = address.get("country") or ""
         primary = city or state or country
         secondary = country if primary != country else state
+        if not primary:
+            return {"primary": ocean_name(lat, lon), "secondary": "", "kind": "ocean"}
         return {"primary": str(primary), "secondary": str(secondary), "kind": "land"}
     except Exception:
         return {"primary": ocean_name(lat, lon), "secondary": "", "kind": "ocean"}
@@ -163,6 +165,20 @@ def normalize_adsb(raw: dict[str, Any]) -> dict[str, Any]:
         "alt_geom": raw.get("alt_geom"), "gs": raw.get("gs"), "track": raw.get("track"),
         "baro_rate": raw.get("baro_rate"), "seen": raw.get("seen", 0),
         "aircraft_type": raw.get("t"), "registration": raw.get("r"), "source": "adsb.fi",
+    }
+
+
+def normalize_fr24(raw: dict[str, Any]) -> dict[str, Any]:
+    """Translate an FR24 full-position row into the tracker aircraft schema."""
+    return {
+        "hex": str(raw.get("hex") or "").lower(),
+        "flight": str(raw.get("callsign") or raw.get("flight") or "").strip(),
+        "lat": raw.get("lat"), "lon": raw.get("lon"),
+        "alt_baro": raw.get("alt"), "alt_geom": raw.get("alt"),
+        "gs": raw.get("gspeed"), "track": raw.get("track"),
+        "baro_rate": raw.get("vspeed"), "seen": 0,
+        "aircraft_type": raw.get("type"), "registration": raw.get("reg"),
+        "source": "fr24",
     }
 
 
@@ -228,22 +244,26 @@ def main() -> int:
                 missing_since = missing_since or now
             next_poll = now + max(2, float(request.get("poll_seconds", 5)))
 
-        if aircraft and not metadata and now >= next_metadata:
-            if token and aircraft.get("lat") is not None:
+        if not metadata and now >= next_metadata:
+            if token:
                 try:
-                    response = session.get(FR24_URL, headers=headers, params={
-                        "bounds": bounds(float(aircraft["lat"]), float(aircraft["lon"])),
-                        "callsigns": callsign, "limit": 1,
-                    }, timeout=8)
+                    params = {"callsigns": callsign, "limit": 1}
+                    if aircraft.get("lat") is not None and aircraft.get("lon") is not None:
+                        params["bounds"] = bounds(float(aircraft["lat"]), float(aircraft["lon"]))
+                    response = session.get(FR24_URL, headers=headers, params=params, timeout=8)
                     response.raise_for_status()
                     row = (response.json().get("data") or [{}])[0]
+                    if row and not aircraft:
+                        aircraft = normalize_fr24(row)
+                        last_fresh = now
+                        missing_since = 0
                     metadata = {
                         "origin_code": row.get("orig_iata") or row.get("orig_icao"),
                         "destination_code": row.get("dest_iata") or row.get("dest_icao"),
                         "aircraft_type": row.get("type"), "registration": row.get("reg"),
                         "airline": row.get("operating_as") or row.get("painted_as"),
                         "eta": row.get("eta") or row.get("estimated_arrival") or row.get("timestamp_arrival"),
-                    }
+                    } if row else {}
                     budget = read_json(BUDGET_PATH, {})
                     today = datetime.now().astimezone().date().isoformat()
                     if budget.get("date") != today:
