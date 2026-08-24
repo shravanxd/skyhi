@@ -57,6 +57,7 @@ FIELDS: dict[str, tuple[type, float, float]] = {
     "fr24_total_credit_budget": (int, 1000, 1000000),
     "page_seconds": (int, 2, 30),
     "target_release_nm": (float, 2, 50),
+    "avoid_circling_cycles": (int, 0, 20),
     "weather_refresh_seconds": (int, 300, 7200),
     "notification_max_altitude_ft": (int, 500, 50000),
 }
@@ -328,6 +329,7 @@ class Handler(BaseHTTPRequestHandler):
             weather = read_json(WEATHER_PATH, {})
             config.setdefault("fr24_total_credit_budget", 60000)
             config.setdefault("notification_max_altitude_ft", 10000)
+            config.setdefault("avoid_circling_cycles", 3)
             self.send_json({
                 "services": {name: service_state(name) for name in SERVICES},
                 "config": {**{key: config.get(key) for key in FIELDS},

@@ -756,6 +756,16 @@ def select_aircraft(payload: dict[str, Any], config: dict[str, Any]) -> list[dic
     return selected[: int(config["max_aircraft"])]
 
 
+def is_small_aircraft(item: dict[str, Any]) -> bool:
+    """Identify slow, low contacts that commonly orbit near the receiver."""
+    try:
+        speed = float(item.get("gs"))
+        altitude = float(item.get("alt_baro", item.get("alt_geom")))
+        return speed <= 180 and altitude <= 12000
+    except (TypeError, ValueError):
+        return False
+
+
 def make_matrix(config: dict[str, Any]):
     from rgbmatrix import RGBMatrix, RGBMatrixOptions
     m = config["matrix"]
@@ -798,6 +808,8 @@ def main() -> int:
     locked_min_distance = float("inf")
     locked_missing_since: float | None = None
     switched = time.monotonic()
+    displayed_seconds: dict[str, float] = {}
+    suppressed_until: dict[str, float] = {}
     while not STOP.is_set():
         payload = load_json(Path(config["aircraft_json"]), {})
         tracked_state = load_json(TRACKED_FLIGHT_PATH, {})
@@ -812,13 +824,25 @@ def main() -> int:
             canvas = matrix.SwapOnVSync(canvas)
             STOP.wait(0.5)
             continue
-        candidates = select_aircraft(payload, config)
+        now_mono = time.monotonic()
+        suppressed_until = {key: expiry for key, expiry in suppressed_until.items() if expiry > now_mono}
+        candidates = [item for item in select_aircraft(payload, config)
+                      if str(item.get("fr24_id") or item.get("hex") or clean_callsign(item.get("flight"))) not in suppressed_until]
         by_id = {str(a.get("fr24_id") or a.get("hex") or clean_callsign(a.get("flight"))): a for a in candidates}
         aircraft = by_id.get(locked_id) if locked_id else None
         if locked_id and aircraft:
             locked_missing_since = None
-            distance = aircraft.get("_distance_nm")
-            if isinstance(distance, float):
+            repeat_cycles = int(config.get("avoid_circling_cycles", 3))
+            repeat_limit = repeat_cycles * 2 * float(config.get("page_seconds", 5))
+            if repeat_cycles and is_small_aircraft(aircraft) and displayed_seconds.get(locked_id, 0) >= repeat_limit:
+                paused_id = locked_id
+                suppressed_until[locked_id] = now_mono + 1800
+                LOG.info("Pausing repeated small aircraft %s for 30 minutes after %d cycles", locked_id, repeat_cycles)
+                locked_id, aircraft = None, None
+                candidates = [item for item in candidates
+                              if str(item.get("fr24_id") or item.get("hex") or clean_callsign(item.get("flight"))) != paused_id]
+            distance = aircraft.get("_distance_nm") if aircraft else None
+            if aircraft and isinstance(distance, float):
                 receding = distance > locked_min_distance + 0.5
                 locked_min_distance = min(locked_min_distance, distance)
                 if receding and distance > float(config.get("target_release_nm", 10)):
@@ -857,6 +881,8 @@ def main() -> int:
                     extra[key] = aircraft[key]
             page = args.page if args.page is not None else int((time.monotonic() - switched) / float(config.get("page_seconds", 5)))
             frame = renderer.aircraft(aircraft, extra, page)
+            if locked_id:
+                displayed_seconds[locked_id] = displayed_seconds.get(locked_id, 0) + 0.5
         else:
             frame = renderer.idle(len(payload.get("aircraft", [])), weather_data, adsbfi_health.get())
         if args.render_png:

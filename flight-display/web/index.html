@@ -128,6 +128,7 @@
       <div class="setting"><label for="receiver_heading_deg">Heading<span class="hint">148° points southeast</span></label><input id="receiver_heading_deg" type="number" min="0" max="359.9" step="0.1" inputmode="decimal"></div>
       <div class="setting"><label for="window_field_of_view_deg">Field of view<span class="hint">Visible angle from window</span></label><input id="window_field_of_view_deg" type="number" min="20" max="360" inputmode="numeric"></div>
       <div class="setting"><label for="target_release_nm">Release distance<span class="hint">Stop following after fly-by</span></label><input id="target_release_nm" type="number" min="2" max="50" step="0.5" inputmode="decimal"></div>
+      <div class="setting"><label for="avoid_circling_cycles">Small-aircraft repeat limit<span class="hint">Two-page cycles before a 30-minute break; 0 disables</span></label><input id="avoid_circling_cycles" type="number" min="0" max="20" step="1" inputmode="numeric"></div>
     </div><div class="save-row"><button class="primary" id="saveWindow">Save tracking view</button></div></div></section>
 
     <details class="card" id="advanced"><summary><span class="summary-copy"><span class="eyebrow">adsb.fi + FR24</span><span class="section-title">Advanced tracking</span></span><svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="details-body"><div class="budget-meter" id="budget"><strong>Loading enrichment usage…</strong></div><div class="setting-list">
@@ -162,7 +163,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 const displayKeys=['brightness','page_seconds','weather_refresh_seconds'];
-const windowKeys=['receiver_heading_deg','window_field_of_view_deg','target_release_nm'];
+const windowKeys=['receiver_heading_deg','window_field_of_view_deg','target_release_nm','avoid_circling_cycles'];
 const trackingKeys=['fr24_radius_nm','fr24_active_trigger_nm','adsbfi_poll_seconds','adsbfi_close_poll_seconds','fr24_daily_credit_budget','fr24_total_credit_budget'];
 const scheduleKeys=['auto_power_enabled','auto_power_off_time','auto_power_on_time','auto_power_weekend_enabled','auto_power_weekend_off_time','auto_power_weekend_on_time'];
 let loaded=false,authenticated=false,previewMode='live',seenAircraft=new Set(),notificationItems=[];const $=id=>document.getElementById(id);

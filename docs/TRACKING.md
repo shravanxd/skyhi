@@ -75,6 +75,8 @@ A focused flight is independent of the receiver's radius and polygon. The select
 
 Focused screens are readiness-gated. SkyHi keeps the normal nearby-aircraft or idle loop visible while it resolves position, altitude, speed, heading, route, journey progress, ETA, and location. The focused three-screen sequence starts at page one only after every required field is available, so calculation placeholders are never shown on the LED panel.
 
+The normal nearby-aircraft loop can pause slow, low aircraft that linger near the receiver. The portal's **Small-aircraft repeat limit** counts complete identity-and-metrics cycles actually shown on the LED. At the default value of three, a qualifying aircraft at or below 180 knots and 12,000 feet is hidden for 30 minutes after three cycles, allowing other traffic to take its place. Set the limit to 0 to disable the rule.
+
 Journey completion uses great-circle distance between resolved origin and destination airport coordinates. Time to destination prefers the FR24 estimated arrival time when supplied and falls back to remaining distance divided by current ground speed. Both values are estimates and can change with routing, holding, wind, or air traffic control instructions.
 
 Status is derived from real telemetry:

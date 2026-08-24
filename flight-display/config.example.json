@@ -24,6 +24,7 @@
   "fr24_total_credit_budget": 60000,
   "hybrid_local_json": "/run/dump1090-fa/aircraft.json",
   "target_release_nm": 10,
+  "avoid_circling_cycles": 3,
   "cycle_seconds": 10,
   "page_seconds": 5,
   "max_aircraft": 20,
