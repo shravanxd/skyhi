@@ -1,0 +1,18 @@
+[Unit]
+Description=SkyHi worldwide callsign tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shravanxd
+Group=shravanxd
+EnvironmentFile=/home/shravanxd/.config/skyhi/fr24.env
+RuntimeDirectory=skyhi-tracked-flight
+RuntimeDirectoryMode=0755
+ExecStart=/opt/skyhi/flight-display/.venv/bin/python /opt/skyhi/flight-display/flight_tracker.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

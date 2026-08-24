@@ -1,7 +1,8 @@
 [Unit]
 Description=SkyHi LED flight display
 Requires=skyhi-fr24.service dump1090-fa.service
-After=skyhi-fr24.service dump1090-fa.service network-online.target
+Wants=skyhi-flight-tracker.service
+After=skyhi-fr24.service skyhi-flight-tracker.service dump1090-fa.service network-online.target
 
 [Service]
 Type=simple

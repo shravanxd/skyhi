@@ -1,6 +1,6 @@
 # Architecture
 
-SkyHi is four small services connected by JSON files. Keeping the boundaries simple makes the system easy to inspect over SSH and resilient on a Raspberry Pi 3.
+SkyHi is five small services connected by JSON files. Keeping the boundaries simple makes the system easy to inspect over SSH and resilient on a Raspberry Pi 3.
 
 ## Runtime services
 
@@ -45,6 +45,18 @@ The two aircraft pages are:
 
 Long labels use an LED-friendly marquee instead of disappearing behind an ellipsis.
 
+### `skyhi-flight-tracker`
+
+Tracks one user-selected operational callsign worldwide through adsb.fi's exact callsign endpoint. It performs one FR24 enrichment for route and aircraft identity, resolves airport coordinates through HexDB, and caches low-frequency geographic context. State is written to `/run/skyhi-tracked-flight/state.json`.
+
+The focused-flight loop contains three screens:
+
+1. Journey progress, route, flight status, and time to destination
+2. Live altitude, speed, heading, type, registration, and remaining distance
+3. Current city, region, country or ocean, aircraft-local time, and ETA
+
+After the three focused screens, the renderer returns to normal nearby-aircraft behavior for the configured break. Tracking ends automatically after three confirmed ground reports, after a likely landing following an arriving-state signal loss, at the selected deadline, or when stopped from the portal.
+
 ### `skyhi-control`
 
 Serves the local dashboard and a small JSON API on port 8080. It can update configuration, preview LED output, draw a tracking polygon, run panel tests, manage schedules, export backups, and restart approved services.
@@ -68,6 +80,8 @@ The LED display can continue operating with local ADS-B data if the internet is 
 | `/opt/skyhi/flight-display` | deployment | Application code and virtual environment |
 | `/run/dump1090-fa/aircraft.json` | dump1090 | Local aircraft feed |
 | `/run/skyhi-fr24/aircraft.json` | hybrid collector | Local and network aircraft feed |
+| `/run/skyhi-tracked-flight/state.json` | callsign tracker | Focused-flight live state |
+| `~/.local/state/skyhi/tracked-flight-request.json` | control service | Persistent tracking request and timing |
 | `/run/skyhi-weather.json` | display | Cached weather for the UI |
 | `~/.config/skyhi/fr24.env` | administrator | FR24 API token |
 | `~/.config/skyhi/control-auth.json` | control service | PIN hash and session secret |

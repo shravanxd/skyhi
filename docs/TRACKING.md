@@ -69,6 +69,22 @@ The map controls and numeric controls modify the same configuration:
 
 Some `fr24_*` names remain in configuration and service paths to preserve existing installations. They no longer imply continuous FR24 position polling.
 
+## Focused worldwide flight
+
+A focused flight is independent of the receiver's radius and polygon. The selected exact callsign is requested from adsb.fi every five seconds, so it can remain visible across the country or an ocean. The local nearby feed continues running in parallel.
+
+Journey completion uses great-circle distance between resolved origin and destination airport coordinates. Time to destination prefers the FR24 estimated arrival time when supplied and falls back to remaining distance divided by current ground speed. Both values are estimates and can change with routing, holding, wind, or air traffic control instructions.
+
+Status is derived from real telemetry:
+
+- `DEPARTING` for early journey progress or a strong climb
+- `EN ROUTE` during cruise
+- `ARRIVING` near the destination or during a strong descent
+- `LANDED` after repeated ground telemetry or a prolonged signal loss after arrival
+- `SEARCHING` when the callsign is not currently reported
+
+Reverse-geocoded location results are cached and refreshed no more than once per minute after at least 25 nautical miles of movement. Ocean positions use broad geographic ocean labels when no land result exists. Aircraft-local time uses the coordinate's IANA time zone when available and a longitude-based nautical approximation over unsupported ocean areas.
+
 ## Privacy and API behavior
 
 The geographic request necessarily sends the receiver latitude, longitude, and chosen radius to adsb.fi. The precise receiver location stays out of Git because the live `config.json` is ignored. The adsb.fi open-data service is intended for personal, non-commercial use and should be used within its published rate limits.

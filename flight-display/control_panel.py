@@ -32,12 +32,14 @@ AIRCRAFT_PATH = Path("/run/skyhi-fr24/aircraft.json")
 DUMP1090_PATH = Path("/run/dump1090-fa/aircraft.json")
 WEATHER_PATH = Path("/run/skyhi-weather.json")
 PANEL_TEST_PATH = Path("/run/skyhi-panel-test.json")
+TRACKED_FLIGHT_REQUEST_PATH = Path("/home/shravanxd/.local/state/skyhi/tracked-flight-request.json")
+TRACKED_FLIGHT_STATE_PATH = Path("/run/skyhi-tracked-flight/state.json")
 BUDGET_PATH = Path("/home/shravanxd/.local/state/skyhi/fr24-budget.json")
 FR24_METADATA_PATH = Path("/home/shravanxd/.local/state/skyhi/fr24-enrichment.json")
 ROUTE_CACHE_PATH = APP_DIR / "cache" / "enrichment.sqlite3"
 AUTH_PATH = Path("/home/shravanxd/.config/skyhi/control-auth.json")
-SERVICES = ("dump1090-fa", "skyhi-fr24", "skyhi-flight-display")
-POWER_SERVICES = ("dump1090-fa", "skyhi-fr24", "skyhi-flight-display")
+SERVICES = ("dump1090-fa", "skyhi-fr24", "skyhi-flight-tracker", "skyhi-flight-display")
+POWER_SERVICES = ("dump1090-fa", "skyhi-fr24", "skyhi-flight-tracker", "skyhi-flight-display")
 
 FIELDS: dict[str, tuple[type, float, float]] = {
     "receiver_lat": (float, -90, 90),
@@ -274,6 +276,7 @@ class Handler(BaseHTTPRequestHandler):
             "format": "skyhi-backup-v1", "exported_at": datetime.now().astimezone().isoformat(),
             "config": read_json(CONFIG_PATH, {}), "route_cache_b64": route_cache,
             "fr24_metadata": read_json(FR24_METADATA_PATH, {}),
+            "tracked_flight_request": read_json(TRACKED_FLIGHT_REQUEST_PATH, {}),
         })
 
     def is_authenticated(self) -> bool:
@@ -339,6 +342,7 @@ class Handler(BaseHTTPRequestHandler):
                 "budget": budget,
                 "budget_forecast": budget_forecast(config, budget),
                 "weather": weather,
+                "tracked_flight": read_json(TRACKED_FLIGHT_STATE_PATH, {"active": False}),
                 "next_schedule_event": next_schedule_event(config),
                 "diagnostics": {
                     "adsb_file_age_seconds": file_age(DUMP1090_PATH),
@@ -395,6 +399,9 @@ class Handler(BaseHTTPRequestHandler):
                     write_bytes(ROUTE_CACHE_PATH, route_data)
                 if isinstance(backup.get("fr24_metadata"), dict):
                     write_json(FR24_METADATA_PATH, backup["fr24_metadata"])
+                if isinstance(backup.get("tracked_flight_request"), dict):
+                    TRACKED_FLIGHT_REQUEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    write_json(TRACKED_FLIGHT_REQUEST_PATH, backup["tracked_flight_request"])
                 subprocess.run(["systemctl", "restart", "skyhi-fr24", "skyhi-flight-display"], check=True, timeout=20)
                 self.send_json({"ok": True})
             except Exception as exc:
@@ -523,6 +530,42 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self.send_json({"ok": False, "error": str(exc)}, 400)
             return
+        if self.path == "/api/tracked-flight":
+            try:
+                length = min(int(self.headers.get("Content-Length", "0")), 4096)
+                incoming = json.loads(self.rfile.read(length))
+                action = str(incoming.get("action") or "start")
+                if action == "stop":
+                    previous = read_json(TRACKED_FLIGHT_REQUEST_PATH, {})
+                    previous.update({"active": False, "ended_reason": "Stopped from SkyHi Control"})
+                    write_json(TRACKED_FLIGHT_REQUEST_PATH, previous)
+                    self.send_json({"ok": True, "active": False})
+                    return
+                callsign = re.sub(r"[^A-Z0-9]", "", str(incoming.get("callsign") or "").upper())[:10]
+                if not 2 <= len(callsign) <= 10:
+                    raise ValueError("Enter a valid 2 to 10 character callsign")
+                until_landing = bool(incoming.get("until_landing"))
+                duration_hours = float(incoming.get("duration_hours") or 4)
+                if not .25 <= duration_hours <= 48:
+                    raise ValueError("Tracking duration must be between 15 minutes and 48 hours")
+                screen_seconds = int(incoming.get("screen_seconds") or 5)
+                normal_seconds = int(incoming.get("normal_seconds") or 15)
+                if not 3 <= screen_seconds <= 15 or not 5 <= normal_seconds <= 60:
+                    raise ValueError("Screen timing is outside the supported range")
+                now = time.time()
+                value = {
+                    "active": True, "callsign": callsign, "started_at": now,
+                    "until_landing": until_landing,
+                    "expires_at": None if until_landing else now + duration_hours * 3600,
+                    "duration_hours": duration_hours, "screen_seconds": screen_seconds,
+                    "normal_seconds": normal_seconds, "poll_seconds": 5,
+                }
+                TRACKED_FLIGHT_REQUEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+                write_json(TRACKED_FLIGHT_REQUEST_PATH, value)
+                self.send_json({"ok": True, **value})
+            except Exception as exc:
+                self.send_json({"ok": False, "error": str(exc)}, 400)
+            return
         if self.path == "/api/change-pin":
             try:
                 length = min(int(self.headers.get("Content-Length", "0")), 4096)
@@ -547,11 +590,11 @@ class Handler(BaseHTTPRequestHandler):
         action = self.path.rsplit("/", 1)[-1]
         commands = {
             "restart-display": ["systemctl", "restart", "skyhi-flight-display"],
-            "restart-tracker": ["systemctl", "restart", "skyhi-fr24", "dump1090-fa"],
-            "restart-all": ["systemctl", "restart", "dump1090-fa", "skyhi-fr24", "skyhi-flight-display"],
+            "restart-tracker": ["systemctl", "restart", "skyhi-fr24", "skyhi-flight-tracker", "dump1090-fa"],
+            "restart-all": ["systemctl", "restart", "dump1090-fa", "skyhi-fr24", "skyhi-flight-tracker", "skyhi-flight-display"],
             # Keep this web service alive so the same page can turn SkyHi on.
-            "turn-off": ["systemctl", "stop", "skyhi-flight-display", "skyhi-fr24", "dump1090-fa"],
-            "turn-on": ["systemctl", "start", "dump1090-fa", "skyhi-fr24", "skyhi-flight-display"],
+            "turn-off": ["systemctl", "stop", "skyhi-flight-display", "skyhi-flight-tracker", "skyhi-fr24", "dump1090-fa"],
+            "turn-on": ["systemctl", "start", "dump1090-fa", "skyhi-fr24", "skyhi-flight-tracker", "skyhi-flight-display"],
         }
         if action not in commands:
             self.send_json({"ok": False, "error": "Action not allowed"}, 400)

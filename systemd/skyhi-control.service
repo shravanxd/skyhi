@@ -1,6 +1,6 @@
 [Unit]
 Description=SkyHi local web control panel
-After=network.target skyhi-flight-display.service
+After=network.target skyhi-flight-tracker.service skyhi-flight-display.service
 
 [Service]
 Type=simple

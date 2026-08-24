@@ -29,6 +29,7 @@ LOG = logging.getLogger("skyhi")
 STOP = threading.Event()
 WEATHER_STATE_PATH = Path("/run/skyhi-weather.json")
 PANEL_TEST_PATH = Path("/run/skyhi-panel-test.json")
+TRACKED_FLIGHT_PATH = Path("/run/skyhi-tracked-flight/state.json")
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -543,6 +544,94 @@ class Renderer:
     def aircraft(self, item: dict[str, Any], extra: dict[str, Any], page: int = 0) -> Image.Image:
         return self.identity(item, extra) if page % 2 == 0 else self.metrics(item, extra)
 
+    def tracked_progress(self, image: Image.Image, state: dict[str, Any]) -> None:
+        draw = ImageDraw.Draw(image)
+        progress = state.get("progress")
+        draw.rounded_rectangle((2, 1, 125, 4), radius=2, fill="#3B4650")
+        if isinstance(progress, (int, float)):
+            width = max(3, round(123 * max(0, min(1, float(progress)))))
+            draw.rounded_rectangle((2, 1, 2 + width, 4), radius=2, fill="#62F58A")
+        else:
+            draw.rounded_rectangle((2, 1, 16, 4), radius=2, fill="#62F58A")
+
+    @staticmethod
+    def duration_text(seconds: Any) -> str:
+        if not isinstance(seconds, (int, float)) or seconds < 0:
+            return "CALCULATING"
+        minutes = max(0, round(float(seconds) / 60))
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours}H {minutes:02d}M" if hours else f"{minutes} MIN"
+
+    def tracked(self, state: dict[str, Any], page: int) -> Image.Image:
+        image = Image.new("RGB", (128, 64), "black")
+        draw = ImageDraw.Draw(image)
+        colors = self.colors()
+        self.tracked_progress(image, state)
+        item = state.get("aircraft") or {}
+        callsign = clean_callsign(state.get("callsign")) or "TRACKED"
+        status = str(state.get("status") or "SEARCHING")
+        origin = state.get("origin") or {}
+        destination = state.get("destination") or {}
+        origin_code = str(origin.get("code") or item.get("origin_code") or "---")
+        destination_code = str(destination.get("code") or item.get("destination_code") or "---")
+        logo = self.logo(callsign[:3])
+
+        if page % 3 == 0:
+            if logo:
+                frame = self.logo_frame(logo, 27, 22)
+                image.paste(frame, (1, 7), frame)
+            draw.text((30, 6), self.fit(draw, callsign, self.f14, 96), font=self.f14, fill="#FFFFFF")
+            route = f"{origin_code}  >  {destination_code}"
+            draw.text((30, 21), self.fit(draw, route, self.f10, 96), font=self.f10, fill=colors["accent"])
+            draw.line((2, 33, 125, 33), fill=colors["line"])
+            draw.text((2, 35), "FLIGHT STATUS", font=self.f7, fill=colors["muted"])
+            draw.text((2, 44), self.fit(draw, status, self.f10, 59), font=self.f10,
+                      fill=colors["good"] if status in ("EN ROUTE", "LANDED") else colors["warm"])
+            draw.text((67, 35), "TIME TO DEST", font=self.f7, fill=colors["muted"])
+            draw.text((67, 44), self.duration_text(state.get("eta_seconds")), font=self.f10, fill=colors["warm"])
+            progress = state.get("progress")
+            footer = f"{round(float(progress) * 100)}% COMPLETE" if isinstance(progress, (int, float)) else "ROUTE CALCULATING"
+            draw.text((2, 55), footer, font=self.f8, fill=colors["soft"])
+            return image
+
+        if page % 3 == 1:
+            draw.text((2, 7), callsign, font=self.f10, fill="#FFFFFF")
+            draw.text((124 - draw.textlength(status, font=self.f8), 8), status, font=self.f8, fill=colors["good"])
+            draw.line((2, 19, 125, 19), fill=colors["line"])
+            altitude = item.get("alt_baro", item.get("alt_geom"))
+            altitude_text = "GROUND" if altitude == "ground" else (f"{int(float(altitude)):,}" if altitude is not None else "--")
+            speed = item.get("gs")
+            speed_text = f"{round(float(speed))}" if speed is not None else "--"
+            heading = item.get("track")
+            heading_text = f"{round(float(heading))}°" if heading is not None else "--"
+            for x, label, value, color in ((2, "ALT - ft", altitude_text, colors["warm"]),
+                                           (48, "SPEED - kt", speed_text, colors["good"]),
+                                           (96, "HEADING", heading_text, colors["accent"])):
+                draw.text((x, 22), label, font=self.f7, fill=colors["muted"])
+                draw.text((x, 32), value, font=self.f10, fill=color)
+            draw.line((2, 45, 125, 45), fill=colors["line"])
+            aircraft_type = friendly_aircraft_type(item.get("aircraft_type"))
+            registration = str(item.get("registration") or "")
+            self.marquee(image, (2, 48), f"{aircraft_type}  {registration}".strip(), self.f9, 82, colors["soft"])
+            remaining = state.get("remaining_nm")
+            remaining_text = f"{float(remaining):.0f} NM" if isinstance(remaining, (int, float)) else "-- NM"
+            draw.text((124 - draw.textlength(remaining_text, font=self.f8), 50), remaining_text, font=self.f8, fill=colors["muted"])
+            return image
+
+        location = state.get("location") or {}
+        primary = str(location.get("primary") or "LOCATING AIRCRAFT")
+        secondary = str(location.get("secondary") or ("OCEAN POSITION" if location.get("kind") == "ocean" else ""))
+        draw.text((2, 7), "CURRENTLY OVER", font=self.f7, fill=colors["muted"])
+        self.marquee(image, (2, 15), primary.upper(), self.f14, 124, colors["accent"], speed=7)
+        if secondary:
+            self.marquee(image, (2, 31), secondary.upper(), self.f9, 124, colors["soft"], speed=6)
+        draw.line((2, 43, 125, 43), fill=colors["line"])
+        draw.text((2, 46), "LOCAL TIME", font=self.f7, fill=colors["muted"])
+        draw.text((2, 53), str(state.get("local_time") or "--"), font=self.f10, fill="#FFFFFF")
+        eta = self.duration_text(state.get("eta_seconds"))
+        draw.text((124 - draw.textlength(eta, font=self.f9), 52), eta, font=self.f9, fill=colors["warm"])
+        return image
+
     def test_pattern(self, pattern: str) -> Image.Image:
         solid = {"white": "#FFFFFF", "red": "#FF0000", "green": "#00FF00", "blue": "#0000FF"}
         if pattern in solid:
@@ -707,6 +796,7 @@ def main() -> int:
     switched = time.monotonic()
     while not STOP.is_set():
         payload = load_json(Path(config["aircraft_json"]), {})
+        tracked_state = load_json(TRACKED_FLIGHT_PATH, {})
         weather_data = weather.get()
         panel_test = load_json(PANEL_TEST_PATH, {})
         if float(panel_test.get("expires", 0)) > time.time():
@@ -744,7 +834,17 @@ def main() -> int:
             switched = time.monotonic()
             LOG.info("Locked target %s at %.1f nm", locked_id, locked_min_distance)
 
-        if aircraft:
+        tracked_screen_seconds = max(3, float(tracked_state.get("screen_seconds", 5)))
+        tracked_normal_seconds = max(5, float(tracked_state.get("normal_seconds", 15)))
+        tracked_block = tracked_screen_seconds * 3
+        tracked_cycle = tracked_block + tracked_normal_seconds
+        tracked_phase = (time.time() - float(tracked_state.get("started_at") or time.time())) % tracked_cycle
+        show_tracked = bool(tracked_state.get("active") and time.time() - float(tracked_state.get("updated", 0)) < 30
+                            and tracked_phase < tracked_block)
+        if show_tracked:
+            tracked_page = min(2, int(tracked_phase / tracked_screen_seconds))
+            frame = renderer.tracked(tracked_state, tracked_page)
+        elif aircraft:
             extra = cache.request(aircraft)
             # FR24 full positions already include these authoritative fields.
             for key in ("aircraft_type", "registration", "origin_code", "destination_code"):

@@ -16,8 +16,10 @@ This started as a side project built around one window, one antenna, and the que
 - Combines fast local telemetry with continuous nearby adsb.fi network tracking
 - Uses cached, one-shot Flightradar24 requests only for missing metadata
 - Prioritizes aircraft inside a configurable window heading or map polygon
+- Tracks one chosen callsign worldwide until landing or a configurable deadline
 - Displays airline, flight, route, aircraft model, altitude, speed, direction, and distance
 - Cycles between an identity page and a live metrics page
+- Blends three journey, telemetry, and location screens into the normal loop for a focused flight
 - Handles dark airline artwork without adding permanent white logo boxes
 - Scrolls long aircraft names such as `737 MAX 8`
 - Shows an idle screen with time, day, weather, and live adsb.fi feed health

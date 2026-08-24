@@ -97,10 +97,11 @@ Review the usernames and paths in [`systemd/`](../systemd/) before copying them.
 
 ```bash
 sudo cp ../source/systemd/skyhi-fr24.service /etc/systemd/system/
+sudo cp ../source/systemd/skyhi-flight-tracker.service /etc/systemd/system/
 sudo cp ../source/systemd/skyhi-flight-display.service /etc/systemd/system/
 sudo cp ../source/systemd/skyhi-control.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
+sudo systemctl enable --now dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
 ```
 
 Open `http://skyhi.local:8080/`. On first start, the control service prints a generated six-digit PIN to its journal. Change it from the dashboard after signing in.
@@ -110,7 +111,7 @@ Open `http://skyhi.local:8080/`. On first start, the control service prints a ge
 ```bash
 jq '.aircraft[:3]' /run/dump1090-fa/aircraft.json
 jq '.aircraft[:3]' /run/skyhi-fr24/aircraft.json
-systemctl status dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
+systemctl status dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
 ```
 
 Use the dashboard preview before running solid-color tests on the physical panel.

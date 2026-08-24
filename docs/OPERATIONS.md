@@ -3,9 +3,9 @@
 ## Service controls
 
 ```bash
-sudo systemctl start dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
-sudo systemctl stop dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
-sudo systemctl restart dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
+sudo systemctl start dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
+sudo systemctl stop dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
+sudo systemctl restart dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
 ```
 
 The web control service is intentionally separate from the three power services. Turning off SkyHi from the dashboard stops reception, polling, and the LED display while leaving the control page available to turn them back on.
@@ -13,7 +13,7 @@ The web control service is intentionally separate from the three power services.
 ## Health checks
 
 ```bash
-systemctl is-active dump1090-fa skyhi-fr24 skyhi-flight-display skyhi-control
+systemctl is-active dump1090-fa skyhi-fr24 skyhi-flight-tracker skyhi-flight-display skyhi-control
 systemctl is-active adsbfi-feed adsbfi-mlat
 stat /run/dump1090-fa/aircraft.json
 stat /run/skyhi-fr24/aircraft.json
@@ -21,6 +21,21 @@ journalctl -u skyhi-flight-display --since "10 minutes ago" --no-pager
 ```
 
 Healthy aircraft JSON should contain a recent `now` value and an `aircraft` array. A quiet sky can produce an empty array without indicating a fault.
+
+## Worldwide callsign tracking
+
+Use the **Track a specific flight** card in SkyHi Control. Enter the operational callsign shown by flight trackers or air traffic control, not merely an airline's public booking number when the two differ.
+
+The default presentation is three five-second focused screens followed by fifteen seconds of normal SkyHi nearby tracking. Both durations can be changed in the card. Choose **Track until landing** or turn it off and set a maximum duration from 15 minutes to 48 hours.
+
+Inspect live state and logs:
+
+```bash
+jq . /run/skyhi-tracked-flight/state.json
+journalctl -u skyhi-flight-tracker -f
+```
+
+If a callsign cannot be found, confirm the flight is airborne and that the operational callsign is correct. Some blocked, private, military, or non-ADS-B aircraft may not be available. Location hints update only after meaningful movement and at a deliberately low request rate.
 
 ## Common problems
 
