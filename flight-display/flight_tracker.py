@@ -248,13 +248,15 @@ def main() -> int:
                 missing_since = missing_since or now
             next_poll = now + max(2, float(request.get("poll_seconds", 5)))
 
-        if not metadata and now >= next_metadata:
+        if now >= next_metadata:
+            fr24_row: dict[str, Any] = {}
             if token:
                 try:
                     params = {"callsigns": callsign, "limit": 1}
                     response = session.get(FR24_URL, headers=headers, params=params, timeout=8)
                     response.raise_for_status()
                     row = (response.json().get("data") or [{}])[0]
+                    fr24_row = row
                     if row:
                         aircraft = {**normalize_fr24(row), **aircraft}
                         last_fresh = now
@@ -282,10 +284,15 @@ def main() -> int:
                 route_origin, route_destination = route_lookup(session, callsign)
                 metadata["origin_code"] = metadata.get("origin_code") or route_origin
                 metadata["destination_code"] = metadata.get("destination_code") or route_destination
-            origin = airport(session, str(metadata.get("origin_code") or ""))
-            destination = airport(session, str(metadata.get("destination_code") or ""))
-            # Retry missing route data occasionally, never on every render loop.
-            next_metadata = now + (21600 if metadata.get("origin_code") and metadata.get("destination_code") else 300)
+            origin_code = str(metadata.get("origin_code") or "")
+            destination_code = str(metadata.get("destination_code") or "")
+            if not origin or str(origin.get("code") or "") != origin_code:
+                origin = airport(session, origin_code)
+            if not destination or str(destination.get("code") or "") != destination_code:
+                destination = airport(session, destination_code)
+            # A focused flight gets one global FR24 refresh every 30 seconds.
+            # Missing flights back off so an invalid callsign does not waste credits.
+            next_metadata = now + (30 if fr24_row else 300)
 
         lat, lon = aircraft.get("lat"), aircraft.get("lon")
         if lat is not None and lon is not None:
