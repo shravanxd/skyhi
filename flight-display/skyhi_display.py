@@ -358,6 +358,7 @@ class Renderer:
         self.f7 = ImageFont.truetype(font, 7)
         self.f9 = ImageFont.truetype(font, 9)
         self.f10 = ImageFont.truetype(bold, 10)
+        self.f12 = ImageFont.truetype(bold, 12)
         self.f14 = ImageFont.truetype(bold, 14)
         self.logo_cache: dict[str, Image.Image] = {}
 
@@ -625,7 +626,7 @@ class Renderer:
         primary = str(location.get("primary") or "LOCATING AIRCRAFT")
         secondary = str(location.get("secondary") or ("OCEAN POSITION" if location.get("kind") == "ocean" else ""))
         draw.text((2, 7), "CURRENTLY OVER", font=self.f7, fill=colors["muted"])
-        self.marquee(image, (2, 15), primary.upper(), self.f14, 124, colors["accent"], speed=7)
+        self.marquee(image, (2, 15), primary.upper(), self.f12, 124, colors["accent"], speed=7)
         if secondary:
             self.marquee(image, (2, 31), secondary.upper(), self.f9, 124, colors["soft"], speed=6)
         draw.line((2, 43, 125, 43), fill=colors["line"])
