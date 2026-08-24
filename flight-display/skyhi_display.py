@@ -398,7 +398,10 @@ class Renderer:
         if text_width <= width:
             draw.text(position, text, font=font, fill=fill)
             return
-        height, gap = 11, 10
+        # Size the marquee strip from the font's real pixel bounds. A fixed
+        # 11-pixel strip clips the bottom of the 14-pixel location heading.
+        bounds = draw.textbbox((0, 0), text, font=font)
+        height, gap = max(1, math.ceil(bounds[3]) + 1), 10
         offset = int(time.monotonic() * speed) % (text_width + gap)
         strip = Image.new("RGB", (width, height), "black")
         strip_draw = ImageDraw.Draw(strip)
