@@ -252,8 +252,6 @@ def main() -> int:
             if token:
                 try:
                     params = {"callsigns": callsign, "limit": 1}
-                    if aircraft.get("lat") is not None and aircraft.get("lon") is not None:
-                        params["bounds"] = bounds(float(aircraft["lat"]), float(aircraft["lon"]))
                     response = session.get(FR24_URL, headers=headers, params=params, timeout=8)
                     response.raise_for_status()
                     row = (response.json().get("data") or [{}])[0]
