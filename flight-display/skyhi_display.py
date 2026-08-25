@@ -594,7 +594,7 @@ class Renderer:
             draw.text((67, 35), "TIME TO DEST", font=self.f7, fill=colors["muted"])
             draw.text((67, 44), self.duration_text(state.get("eta_seconds")), font=self.f10, fill=colors["warm"])
             progress = state.get("progress")
-            footer = f"{round(float(progress) * 100)}% COMPLETE" if isinstance(progress, (int, float)) else "ROUTE CALCULATING"
+            footer = f"{float(progress) * 100:.1f}% COMPLETE" if isinstance(progress, (int, float)) else "ROUTE CALCULATING"
             draw.text((2, 55), footer, font=self.f8, fill=colors["soft"])
             return image
 

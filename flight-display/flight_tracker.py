@@ -201,6 +201,7 @@ def main() -> int:
     ground_count = 0
     last_status = "SEARCHING"
     last_fresh = 0.0
+    last_fr24 = 0.0
     ready_at = 0.0
 
     while not STOP.is_set():
@@ -225,6 +226,7 @@ def main() -> int:
             geo_lat = geo_lon = None
             missing_since = ground_count = 0
             last_status, last_fresh = "SEARCHING", 0
+            last_fr24 = 0
             ready_at = 0
             LOG.info("Tracking requested for %s", callsign)
 
@@ -239,6 +241,10 @@ def main() -> int:
                     update = normalize_adsb(exact)
                     # Sparse ocean ADS-B records can omit speed or heading.
                     # Refresh available fields without erasing richer FR24 data.
+                    if now - last_fr24 < 45:
+                        for key in ("lat", "lon", "alt_baro", "alt_geom", "gs", "track",
+                                    "baro_rate", "seen", "source"):
+                            update.pop(key, None)
                     aircraft = {**aircraft, **{key: value for key, value in update.items()
                                                if value is not None and value != ""}}
                     last_fresh = now
@@ -260,7 +266,10 @@ def main() -> int:
                     row = (response.json().get("data") or [{}])[0]
                     fr24_row = row
                     if row:
-                        aircraft = {**normalize_fr24(row), **aircraft}
+                        update = normalize_fr24(row)
+                        aircraft = {**aircraft, **{key: value for key, value in update.items()
+                                                  if value is not None and value != ""}}
+                        last_fr24 = now
                         last_fresh = now
                         missing_since = 0
                     metadata = {
