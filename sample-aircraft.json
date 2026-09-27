@@ -1,0 +1,16 @@
+{
+  "now": 1787343324.2,
+  "messages": 100,
+  "aircraft": [{
+    "hex": "a1b2c3",
+    "flight": "DAL1234 ",
+    "lat": 40.7,
+    "lon": -74.0,
+    "alt_baro": 12500,
+    "gs": 287.4,
+    "track": 224.0,
+    "rssi": -12.4,
+    "seen": 0.2,
+    "messages": 120
+  }]
+}
